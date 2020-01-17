@@ -727,7 +727,7 @@ class DeflateBuffer:
             self.decompressor = BrotliDecoder()  # type: Any
         else:
             zlib_mode = (16 + zlib.MAX_WBITS
-                         if encoding == 'gzip' else -zlib.MAX_WBITS)
+                         if encoding == 'gzip' else zlib.MAX_WBITS)
             self.decompressor = zlib.decompressobj(wbits=zlib_mode)
 
     def set_exception(self, exc: BaseException) -> None:
@@ -739,7 +739,9 @@ class DeflateBuffer:
             chunk = self.decompressor.decompress(chunk)
         except Exception:
             if not self._started_decoding and self.encoding == 'deflate':
-                self.decompressor = zlib.decompressobj()
+                # Try to change the decoder to decompress incorrectly
+                # compressed data
+                self.decompressor = zlib.decompressobj(wbits=-zlib.MAX_WBITS)
                 try:
                     chunk = self.decompressor.decompress(chunk)
                 except Exception:

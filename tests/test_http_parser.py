@@ -1,7 +1,6 @@
 # Tests for aiohttp/protocol.py
 
 import asyncio
-import zlib
 from unittest import mock
 
 import pytest
@@ -837,22 +836,22 @@ class TestParsePayload:
         assert b'12' == b''.join(d for d, _ in out._buffer)
         assert b'45' == tail
 
-    _comp = zlib.compressobj(wbits=-zlib.MAX_WBITS)
-    _COMPRESSED = b''.join([_comp.compress(b'data'), _comp.flush()])
-
     async def test_http_payload_parser_deflate(self, stream) -> None:
-        length = len(self._COMPRESSED)
+        COMPRESSED = b'x\x9cKI,I\x04\x00\x04\x00\x01\x9b'
+
+        length = len(COMPRESSED)
         out = aiohttp.FlowControlDataQueue(stream,
                                            loop=asyncio.get_event_loop())
         p = HttpPayloadParser(
             out, length=length, compression='deflate')
-        p.feed_data(self._COMPRESSED)
+        p.feed_data(COMPRESSED)
         assert b'data' == b''.join(d for d, _ in out._buffer)
         assert out.is_eof()
 
-    async def test_http_payload_parser_deflate_no_wbits(self, stream) -> None:
-        comp = zlib.compressobj()
-        COMPRESSED = b''.join([comp.compress(b'data'), comp.flush()])
+    async def test_http_payload_parser_deflate_no_hdrs(self, stream) -> None:
+        """Tests incorrectly formed data (no zlib headers) """
+
+        COMPRESSED = b'KI,I\x04\x00'
 
         length = len(COMPRESSED)
         out = aiohttp.FlowControlDataQueue(stream,
@@ -905,7 +904,7 @@ class TestDeflateBuffer:
         dbuf.decompressor.decompress.side_effect = exc
 
         with pytest.raises(http_exceptions.ContentEncodingError):
-            dbuf.feed_data(b'data', 4)
+            dbuf.feed_data(b'data1', 5)
 
     async def test_feed_eof(self, stream) -> None:
         buf = aiohttp.FlowControlDataQueue(stream,
